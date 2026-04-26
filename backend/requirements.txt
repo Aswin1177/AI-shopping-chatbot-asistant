@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pandas
+faiss-cpu
+google-generativeai
+numpy==1.26.4
+torch==2.2.2
+sentence-transformers==2.6.1
+transformers==4.38.2
