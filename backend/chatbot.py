@@ -1,5 +1,5 @@
 import data
-
+import os
 def combine_texts(row):
     return f"""Product_name :{row["product_name"]},Category:{row["category"]},
     About:{row["about_product"]}, Review title: {row["review_title"]},
@@ -39,7 +39,8 @@ def retrieve(query, k=2):
 
  
 import google.generativeai as genai
-genai.configure(api_key="AIzaSyBaXIbC6Ax3821uzhfxGQiBu6DwATKo2O0")
+
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 model=genai.GenerativeModel('gemini-2.5-flash')
 

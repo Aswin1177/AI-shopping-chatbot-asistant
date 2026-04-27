@@ -1,8 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
+from dotenv import load_dotenv
+import os
 from pydantic import BaseModel
 import chatbot
 
+load_dotenv()
+
 app=FastAPI()
+
+SECRET = os.getenv("APP_SECRET")
 
 from typing import List
 
@@ -15,7 +21,14 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 
-def chat(req: ChatRequest):
-    user_query = req.messages[-1].content
+def chat(data: dict, x_api_key: str = Header(None)):
+
+    if x_api_key != SECRET:
+
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    user_query = data["messages"][0]["content"]
+
     answer = chatbot.chatbot_response(user_query)
-    return {"answer": answer}
+
+    return {"response": answer}

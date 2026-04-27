@@ -1,7 +1,8 @@
 import streamlit as st
 import requests
 
-API_URL = "http://127.0.0.1:8000/chat"
+API_URL = "http://13.201.20.19:8000/chat"
+API_SECRET = "password"
 
 st.set_page_config(page_title="AI Shopping Assistant")
 
@@ -31,12 +32,25 @@ if user_input:
         st.markdown(user_input)
 
     # Send to backend
-    response = requests.post(
-        API_URL,
-        json={"messages": st.session_state.messages}
-    )
+    try:
+        response = requests.post(
+            API_URL,
+            headers={"x-api-key": API_SECRET},
+            json={"messages": st.session_state.messages}
+        )
 
-    answer = response.json()["answer"]
+        data = response.json()
+
+        # handle backend response safely
+        if "response" in data:
+            answer = data["response"]
+        elif "error" in data:
+            answer = f"Error: {data['error']}"
+        else:
+            answer = "Unexpected response from server"
+
+    except Exception as e:
+        answer = f"Request failed: {str(e)}"
 
     # Add assistant response
     st.session_state.messages.append({
