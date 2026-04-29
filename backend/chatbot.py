@@ -1,5 +1,7 @@
 import data
 import os
+from dotenv import load_dotenv
+load_dotenv()
 def combine_texts(row):
     return f"""Product_name :{row["product_name"]},Category:{row["category"]},
     About:{row["about_product"]}, Review title: {row["review_title"]},
@@ -19,12 +21,16 @@ index.add(embeddings)
 
 data_store=[]
 for _,row in data.df.iterrows():
-    data_store.append({"text":row["combined_texts"],
-                "discounted_price":row["discounted_price"],
-                "actual_price":row["actual_price"],
-                "discount_percentage": row["discount_percentage"],
-                "rating":row["rating"],
-                "rating_count":row["rating_count"]})
+    data_store.append({"product_name":row["product_name"],
+                       "category": row["category"],
+                       "about": row["about_product"],
+                       "review_title": row["review_title"],
+                       "review": row["review_content"],
+                       "discounted_price":row["discounted_price"],
+                       "actual_price":row["actual_price"],
+                       "discount_percentage": row["discount_percentage"],
+                       "rating":row["rating"],
+                       "rating_count":row["rating_count"]})
 
 def retrieve(query, k=2):
     query_emb = txt_model.encode([query]).astype('float32')
@@ -42,7 +48,7 @@ import google.generativeai as genai
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-model=genai.GenerativeModel('gemini-2.5-flash')
+model=genai.GenerativeModel('gemini-2.5-flash-lite')
 
 chat=model.start_chat(history=[])
 last_queries=[]
@@ -54,88 +60,154 @@ def chatbot_response(query):
     last_queries.append(query)
     last_queries=last_queries[-3:]
     refined_query=" ".join(last_queries)
-
     # Retrieve relevant context
     context = retrieve(refined_query, k=3)
 
-    # Format context cleanly
-    formatted_context = ""
-    for item in context:
-        formatted_context += f"""
-        Product:
-        {item['text']}
+    def get_index_from_query(query):
+        q = query.lower()
+        if "first" in q or "1" in q:
+            return 0
+        elif "second" in q or "2" in q:
+            return 1
+        elif "third" in q or "3" in q:
+            return 2
+        return None
+    global last_results
+
+
+    if query.lower() in ["exit", "quit", "stop"]:
+        return "Session ended."
+
+    idx = get_index_from_query(query)
+
+    if idx is not None and len(last_results) > idx:
+        item = last_results[idx]
+
+        return f"""
+        Product: {item['product_name']}
         Price: ₹{item['discounted_price']}
         Original Price: ₹{item['actual_price']}
         Discount: {item['discount_percentage']}%
         Rating: {item['rating']} ({item['rating_count']} reviews)
         """
 
+    # -------- STEP 2: RETRIEVE (ONLY CURRENT QUERY) --------
+    last_results = context 
+    formatted_context = ""
+    for item in context:
+        formatted_context += f"""
+        Product Name: {item['product_name']}
+        Category: {item['category']}
+        About:{item['about']}
+        Review Title:{item['review_title']}
+        Full Review:{item['review']}
+        Price: ₹{item['discounted_price']}
+        Original Price: ₹{item['actual_price']}
+        Discount: {item['discount_percentage']}%
+        Rating: {item['rating']} ({item['rating_count']} reviews)
+        """
+    last_results = []
+    
+    global history_text
+    history_text=" "
+
             # Build prompt
     prompt = f"""
-You are an AI Shopping Chatbot.
+    You are an AI Shopping Chatbot.
 
-Your task is to recommend products ONLY using the provided CONTEXT.
+    Your task is to respond intelligently based on the USER QUERY using the provided CONTEXT.
 
--------------------------------------
-CONTEXT FORMAT (IMPORTANT)
--------------------------------------
-Each product in CONTEXT is described as:
+    CONTEXT FORMAT (IMPORTANT)
 
-Product: <product description and features>
-Price: ₹<discounted_price>
-Original Price: ₹<actual_price>
-Discount: <discount_percentage>%
-Rating: <rating> (<rating_count> reviews)
+    Each product in CONTEXT is described as:
 
--------------------------------------
-RULES (STRICT)
--------------------------------------
-1. Use ONLY the products in CONTEXT
-2. Do NOT add or assume any missing information
-3. Do NOT hallucinate
-4. If relevant products are not found, reply:
-   "Sorry, I can't help you with that"
-5. Recommend AT LEAST 3 products
-6. Keep total response UNDER 600 words
-7. Prefer better match to user query.
+    Product Name: <product_name>
+    Category: <category>
+    About: <about_product>
+    Review Title: <review_title>
+    Full Review: <review_content>
+    Price: ₹<discounted_price>
+    Original Price: ₹<actual_price>
+    Discount: <discount_percentage>%
+    Rating: <rating> (<rating_count> reviews)
 
--------------------------------------
-CONTEXT:
--------------------------------------
-{formatted_context}
+    IMPORTANT:
+    - "About" contains product features and specifications
+    - Use reviews only as supporting evidence
+    - Focus mainly on product features, price, and rating
 
--------------------------------------
-USER QUERY:
--------------------------------------
-{query}
+    RULES (STRICT)
 
--------------------------------------
-RESPONSE FORMAT (MANDATORY)
--------------------------------------
-Top Recommendations:
+    1. Use ONLY the products in CONTEXT
+    2. Do NOT hallucinate
+    3. If no products are not found, say:
+    "Sorry, I can't help you with that"
+    4. Keep your responses brief (limit 0 to 600 words)
+    5. If the user is:
+        - greeting (hi, hello)
+        - casual talk (ok, nice, cool)
+        - appreciation (thanks)
+        - closing (bye)
+    → Use only the relevant information from CONTEXT to keep the conversation going
 
-1. Product: <short name or summary>
-   - Price: ₹<discounted_price> (Original: ₹<actual_price>)
-   - Discount: <discount_percentage>%
-   - Rating: <rating> (<rating_count> reviews)
-   - Reason: <why it matches user need>
+    → Respond naturally like a human  
 
-2. Product: ...
+    --- BEHAVIOR CONTROL (CRITICAL) ---
 
-3. Product: ...
+    A. If user asks for recommendations → suggest EXACTLY 3 products  
+    B. If asking about a product → answer ONLY that, no new suggestions  
+    C. If user gives feedback (ok, nice, good, etc.) → respond conversationally  
+    D. If unclear → ask clarification  
 
--------------------------------------
-FINAL INSTRUCTION
--------------------------------------
-- Minimum 3 products required
-- Do NOT exceed 600 words
-- Be concise, clear, and useful
-"""
+    --- CONTEXT ---
+    {formatted_context}
 
+    --- PREVIOUS PRODUCTS SHOWN ---
+    {[item['product_name'] for item in last_results]}
 
+    --- USER QUERY ---
+    {query}
+
+    RESPONSE FORMAT:
+
+    If recommending:
+
+    Top Recommendations:
+
+    1. Product: <name>
+    - Price: ₹<discounted_price> (Original: ₹<actual_price>)
+    - Discount: <discount_percentage>%
+    - Rating: <rating> (<rating_count> reviews)
+    - Reason: <why it matches>
+
+    (3 items total)
+
+    Otherwise:
+    - Respond naturally
+    - Use CONVERSATION HISTORY to identify if the query is connected to previous chat and respond accordingly
+    - DO NOT force recommendations
+    CONVERSATION HISTORY:
+    {history_text}
+
+    FINAL INSTRUCTION:
+    Be concise, human-like, and useful.
+    """
+
+        # -------- STEP 5: GENERATE RESPONSE --------
     response = chat.send_message(
-        prompt,
-        generation_config={"temperature": 0.2}
+            prompt,
+            generation_config={"temperature": 0.2}
     )
+
+    for msg in chat.history:
+        if hasattr(msg, "role"):  # Content object
+            role = msg.role
+            content = msg.parts[0].text if msg.parts else ""
+        else:  # dict
+            role = msg.get("role", "")
+            parts = msg.get("parts", [])
+            content = parts[0].get("text", "") if parts else ""
+
+        history_text += f"{role.capitalize()}: {content}\n"
 
     return response.text

@@ -1,7 +1,8 @@
 import streamlit as st
 import requests
 
-API_URL = "http://13.201.20.19:8000/chat"
+# API_URL = "http://13.201.20.19:8000/chat"
+API_URL = "http://127.0.0.1:8000/chat"
 API_SECRET = "password"
 
 st.set_page_config(page_title="AI Shopping Assistant")
@@ -39,16 +40,7 @@ if user_input:
             json={"messages": st.session_state.messages}
         )
 
-        data = response.json()
-
-        # handle backend response safely
-        if "response" in data:
-            answer = data["response"]
-        elif "error" in data:
-            answer = f"Error: {data['error']}"
-        else:
-            answer = "Unexpected response from server"
-
+        answer = response.json().get("response", response.text)
     except Exception as e:
         answer = f"Request failed: {str(e)}"
 
