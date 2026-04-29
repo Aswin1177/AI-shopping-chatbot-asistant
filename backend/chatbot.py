@@ -54,13 +54,11 @@ chat=model.start_chat(history=[])
 last_queries=[]
 def chatbot_response(query):
     global last_queries
-    # Exit condition
     if query.lower() in ["exit", "quit", "stop"]:
         return "Session ended."
     last_queries.append(query)
     last_queries=last_queries[-3:]
     refined_query=" ".join(last_queries)
-    # Retrieve relevant context
     context = retrieve(refined_query, k=3)
 
     def get_index_from_query(query):
@@ -91,7 +89,6 @@ def chatbot_response(query):
         Rating: {item['rating']} ({item['rating_count']} reviews)
         """
 
-    # -------- STEP 2: RETRIEVE (ONLY CURRENT QUERY) --------
     last_results = context 
     formatted_context = ""
     for item in context:
@@ -111,7 +108,6 @@ def chatbot_response(query):
     global history_text
     history_text=" "
 
-            # Build prompt
     prompt = f"""
     You are an AI Shopping Chatbot.
 
@@ -192,8 +188,7 @@ def chatbot_response(query):
     FINAL INSTRUCTION:
     Be concise, human-like, and useful.
     """
-
-        # -------- STEP 5: GENERATE RESPONSE --------
+    
     response = chat.send_message(
             prompt,
             generation_config={"temperature": 0.2}

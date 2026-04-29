@@ -9,15 +9,12 @@ COPY . .
 
 RUN pip install --upgrade pip
 
-# 1. FORCE numpy first
 RUN pip install --no-cache-dir numpy==1.26.4
 
-# 2. Install torch (depends on numpy)
 RUN pip install --no-cache-dir --default-timeout=1000 \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     torch==2.2.2
 
-# 3. Install rest WITHOUT upgrading numpy
 RUN pip install --no-cache-dir --default-timeout=1000 \
     sentence-transformers==2.6.1 faiss-cpu \
     fastapi uvicorn python-dotenv pandas google-generativeai
