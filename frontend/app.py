@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "http://13.201.20.19:8000/chat"
+API_URL = "http://backend:8000/chat"
 API_SECRET = "password"
 
 st.set_page_config(page_title="Demo-Amazon Shopping Assistant Project")
